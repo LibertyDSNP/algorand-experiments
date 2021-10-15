@@ -1,26 +1,17 @@
-import base64
-
-from algosdk.future import transaction
 from algosdk import mnemonic
 from algosdk.v2client import algod
 from pyteal import *
-from helpers import compile_smart_signature, \
+from helpers import compile_program, \
+    get_funded_account, \
     lsig_payment_txn, \
     payment_transaction, \
     wait_for_confirmation
-
-# user declared account mnemonics
-#benefactor_mnemonic = "REPLACE WITH YOUR OWN MNEMONIC"
-#sender_mnemonic = "REPLACE WITH YOUR OWN MNEMONIC"
-
-benefactor_mnemonic = "science opera whip diesel begin frown able forest inflict load goat matrix tent judge hole floor february similar day drip ugly very resource ability hen"
-sender_mnemonic = "type own seat six margin crisp ivory alpha cross staff uphold wine dish code shoe whale cinnamon bullet vintage lucky ten stool maze absorb surround"
 
 # user declared algod connection parameters. Node must have EnableDeveloperAPI set to true in its config
 
 """Basic Donation Escrow"""
 
-def donation_escrow(benefactor):
+def donation_escrow_teal(benefactor_addr):
     Fee = Int(1000)
 
     #Only the benefactor account can withdraw from this escrow
@@ -28,7 +19,7 @@ def donation_escrow(benefactor):
     program = And(
         Txn.type_enum() == TxnType.Payment,
         Txn.fee() <= Fee,
-        Txn.receiver() == Addr(benefactor),
+        Txn.receiver() == Addr(benefactor_addr),
         Global.group_size() == Int(1),
         Txn.rekey_to() == Global.zero_address()
     )
@@ -37,17 +28,21 @@ def donation_escrow(benefactor):
     return compileTeal(program, Mode.Signature, version=5)
 
 def main() :
+    algod_address = "http://localhost:4001"
+    algod_token = "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+
     # initialize an algodClient
     algod_client = algod.AlgodClient(algod_token, algod_address)
 
-    # define private keys
-    receiver_public_key = mnemonic.to_public_key(benefactor_mnemonic)
+    # these are preset accounts in the local sandbox.
+    sender_addr, sender_privkey, sender_mnemonic = get_funded_account(0)
+    benefactor_addr, _, _ = get_funded_account(1)
 
     print("--------------------------------------------")
     print("Compiling Donation Smart Signature......")
 
-    stateless_program_teal = donation_escrow(receiver_public_key)
-    escrow_result, escrow_address= compile_smart_signature(algod_client, stateless_program_teal)
+    stateless_program_teal = donation_escrow_teal(benefactor_addr)
+    escrow_result, escrow_address = compile_program(algod_client, stateless_program_teal)
 
     print("Program:", escrow_result)
     print("hash: ", escrow_address)
@@ -64,6 +59,7 @@ def main() :
 
     # Withdraws 1 ALGO from smart signature using logic signature.
     withdrawal_amt = 1000000
-    lsig_payment_txn(escrow_result, escrow_address, withdrawal_amt, receiver_public_key, algod_client)
+    lsig_payment_txn(escrow_result, escrow_address, withdrawal_amt, benefactor_addr, algod_client)
+
 
 main()

@@ -3,9 +3,13 @@ from algosdk import account, mnemonic
 from algosdk.future import transaction
 
 
-def get_rich_sender():
+def get_funded_account(index=0):
     # this mnemonic is for a consistently generated sandbox account with lots of algos.
     sender_mnemonic = "metal morning betray sand have banner drum kiss fossil orbit pipe salt once unique fire lady bubble ethics visit junior patrol wire fortune abstract bright"
+
+    if (index >0):
+        sender_mnemonic = "kid bread axis pizza crumble wool rural tomato punch caution side legend immense search enlist exotic faculty tag wage reduce march desk vicious abandon slice"
+
     sender_privKey = mnemonic.to_private_key(sender_mnemonic)
     sender_addr = mnemonic.to_public_key(sender_mnemonic)
     return sender_addr,sender_privKey,sender_mnemonic
@@ -16,10 +20,47 @@ def generate_algorand_keypair():
     return private_key, address
 
 # helper function to compile program source
-def compile_smart_signature(client, source_code):
+def compile_program(client, source_code):
     compile_response = client.compile(source_code)
     return compile_response['result'], compile_response['hash']
 
+# returns the contract address + the contract code as bytes for using in a
+# ApplicationCreate transaction.
+def compile_program_to_bytes(client, source_code) :
+    compile_response = client.compile(source_code)
+    return compile_response['hash'], base64.b64decode(compile_response['result'])
+
+# create new application
+def create_app(algod_client, sender_priv, approval_program, clear_program, global_schema, local_schema):
+    # define sender as creator
+    sender = account.address_from_private_key(sender_priv)
+
+    # declare on_complete as NoOp
+    on_complete = transaction.OnComplete.NoOpOC.real
+
+    # get node suggested parameters
+    params = algod_client.suggested_params()
+
+    # create unsigned transaction
+    txn = transaction.ApplicationCreateTxn(sender, params, on_complete, \
+                                            approval_program, clear_program, \
+                                            global_schema, local_schema)
+    # sign transaction
+    signed_txn = txn.sign(sender_priv)
+    tx_id = signed_txn.transaction.get_txid()
+
+    # send transaction
+    algod_client.send_transactions([signed_txn])
+
+    # await confirmation
+    wait_for_confirmation(algod_client, tx_id, 5)
+
+    # display results
+    transaction_response = algod_client.pending_transaction_info(tx_id)
+    app_id = transaction_response['application-index']
+    print("Created new app-id:", app_id)
+
+    return app_id
 
 # Accounts can only opt into up to 50 smart contracts. Accounts may only create 10 smart contracts.
 # This creates a Logic Signature transaction using the provided logic 'registry_smart_sig_program'

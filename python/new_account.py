@@ -6,7 +6,7 @@ from algosdk import mnemonic
 from algosdk.future.transaction import PaymentTxn
 from helpers import \
     generate_algorand_keypair, \
-    get_rich_sender, \
+    get_funded_account, \
     wait_for_confirmation
 
 # Write down the address, private key, and the passphrase for later usage
@@ -51,7 +51,7 @@ def first_transaction_example(send_priv, send_addr, rcv_addr):
     account_info = algod_client.account_info(send_addr)
     print("Account balance: {} microAlgos".format(account_info.get('amount')) + "\n")
 
-sender_addr,sender_privKey,sender_mnemonic = get_rich_sender()
+sender_addr,sender_privKey,sender_mnemonic = get_funded_account()
 recipient_privKey, recipentAddr = generate_algorand_keypair()
 print("My address: {}".format(recipentAddr))
 print("My private key: {}".format(recipient_privKey))
