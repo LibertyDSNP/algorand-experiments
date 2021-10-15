@@ -1,6 +1,19 @@
 import base64
-from algosdk import mnemonic
+from algosdk import account, mnemonic
 from algosdk.future import transaction
+
+
+def get_rich_sender():
+    # this mnemonic is for a consistently generated sandbox account with lots of algos.
+    sender_mnemonic = "metal morning betray sand have banner drum kiss fossil orbit pipe salt once unique fire lady bubble ethics visit junior patrol wire fortune abstract bright"
+    sender_privKey = mnemonic.to_private_key(sender_mnemonic)
+    sender_addr = mnemonic.to_public_key(sender_mnemonic)
+    return sender_addr,sender_privKey,sender_mnemonic
+
+# helper function to generate a keypair
+def generate_algorand_keypair():
+    private_key, address = account.generate_account()
+    return private_key, address
 
 # helper function to compile program source
 def compile_smart_signature(client, source_code):

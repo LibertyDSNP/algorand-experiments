@@ -2,7 +2,10 @@ import base64
 from algosdk.future import transaction
 from algosdk.v2client import algod
 from pyteal import *
-from helpers import compile_smart_signature, \
+from helpers import \
+    compile_smart_signature, \
+    get_rich_sender, \
+    generate_algorand_keypair, \
     lsig_payment_txn, \
     payment_transaction, \
     wait_for_confirmation
@@ -22,11 +25,11 @@ def approval_program(owner_addr):
     #     [Txn.on_completion() == OnComplete.UpdateApplication, handle_updateapp],
     #     [Txn.on_completion() == OnComplete.DeleteApplication, handle_deleteapp],
     #     [Txn.on_completion() == OnComplete.NoOp, handle_noop]
-    # )
+    )
     program = Return(Int(1))
     return compileTeal(program, Mode.Application, version=5)
 
-def clear_program()
+def clear_program():
     program = Return(Int(1))
     return compileTeal(program, Mode.Application, version=5)
 
@@ -67,11 +70,14 @@ def optin_transaction(senderAddr, sender_logic_sig, amount, receiverAddr, algod_
     return pmtx
 
 # min: 100,000 microalgos
-def main():
+def main_prog():
+    sender_addr, sender_privKey, sender_mnemonic = get_rich_sender()
+    # recipient_privKey, recipentAddr = generate_algorand_keypair()
+
     algod_client = algod.AlgodClient(algod_token, algod_address)
-    application_owner_addr = "W5SZASJBHX7SXDZ7D65G75AWLTCFOPJMNWMQRYPUOWK6R4NGU3CKSL65MA"
+    application_owner_addr = sender_addr
     registry_global_schema = transaction.StateSchema(1)  # DSNPid current
-    registry_local_schema = transaction.StateSchema(1, 15)  # DSNPid, handles
+    registry_local_schema = transaction.StateSchema(1, 1)  # DSNPid, handles
 
     # create the registraton contract by calling ApplicationCreateTxn
     txn = transaction.ApplicationCreateTxn(
@@ -83,8 +89,8 @@ def main():
         registry_local_schema,
 
     )
-    mainRegistrationContract =
-    sender_mnemonic = addr0Phr
+    # TODO: this should be the contract code
+    mainRegistrationContract = "UML2BYE3UIFE2FEUBIMV5NFC5NJQXCNMW6D3N2YW7OTAF7GF6A5AY3MXAM"
 
     stateless_program_teal = registry_smart_sig(mainRegistrationContract)
 
@@ -95,7 +101,7 @@ def main():
     print("Program:", program)
     print("hash: ", stateless_reg_contract_addr)
     print("--------------------------------------------")
-    print("Activating Donation Smart Signature......")
+    print("Activating Registration Smart Signature......")
 
     # Activate contract by sending
     # 100k microalgo minimum balance +
@@ -104,18 +110,27 @@ def main():
     amt = 110001
     payment_transaction(sender_mnemonic, amt, stateless_reg_contract_addr, algod_client)
 
-    print("--------------------------------------------")
-    print("Withdraw from Donation Smart Signature......")
-
     # send a test transaction to the contract.
     lsig_payment_txn(program, stateless_reg_contract_addr, 0, mainRegistrationContract, algod_client)
 
     # send an opt-in transaction to the contract.
+    print("--------------------------------------------")
+    print("Call Smart Signature to opt in")
     encoded_prog = program.encode()
     decodedBytes = base64.decodebytes(encoded_prog)
     lsig = transaction.LogicSig(decodedBytes)
 
     # should we be sending the application id, can't just use any value
-    optin_transaction(stateless_reg_contract_addr, lsig, 1000,  mainRegistrationContractId, algod_client)
+    # optin_transaction(stateless_reg_contract_addr, lsig, 1000,  mainRegistrationContractId, algod_client)
 
-main()
+if __name__ == "__main__":
+    import argparse
+
+    parser = argparse.ArgumentParser(description='do stuff')
+    parser.add_argument('from', type=str, nargs=1, help='sender address')
+    parser.add_argument('to', type=str, nargs=1, help='receiver address')
+
+    args = parser.parse_args()
+    myvars = vars(args)
+    print(myvars.get("from")[0])
+    print(myvars.get("to")[0])
