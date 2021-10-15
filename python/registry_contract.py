@@ -25,7 +25,7 @@ def approval_program(owner_addr):
     #     [Txn.on_completion() == OnComplete.UpdateApplication, handle_updateapp],
     #     [Txn.on_completion() == OnComplete.DeleteApplication, handle_deleteapp],
     #     [Txn.on_completion() == OnComplete.NoOp, handle_noop]
-    )
+    # )
     program = Return(Int(1))
     return compileTeal(program, Mode.Application, version=5)
 
