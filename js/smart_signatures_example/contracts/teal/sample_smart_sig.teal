@@ -1,0 +1,21 @@
+#pragma version 4
+txn TypeEnum
+int pay
+==
+txn Fee
+int 1000
+<=
+&&
+txn Receiver
+addr NZHJVFZNVQGCKVMSHZC2QCB22EO7CU6ZXPH3XFRS5RENGVLUTI2K3J2ALA
+==
+&&
+global GroupSize
+int 1
+==
+&&
+txn RekeyTo
+global ZeroAddress
+==
+&&
+return
