@@ -7,6 +7,14 @@ from algosdk.future import transaction
 # avm sdk pooled groups
 # pytealdbg ???  make a dry run request / txn?
 
+# opting into an ASA best practices: https://forum.algorand.org/t/task-build-an-algorand-smart-contract/1188/30
+
+#  "Applications that only use global state do not require accounts to opt in."
+#  "Accounts can only opt into up to 50 smart contracts. Accounts may only create 10 smart contracts.'
+#  see: https://developer.algorand.org/docs/get-details/dapps/smart-contracts/apps/
+
+def decode_note(txn):
+    return base64.b64decode(txn["txn"]["txn"]["note"]).decode()
 
 def get_funded_account(index=0):
     # these mnemonics are for consistently generated sandbox localhost accounts
@@ -14,6 +22,7 @@ def get_funded_account(index=0):
     # Address: W5SZASJBHX7SXDZ7D65G75AWLTCFOPJMNWMQRYPUOWK6R4NGU3CKSL65MA
     sender_mnemonic = "metal morning betray sand have banner drum kiss fossil orbit pipe salt once unique fire lady bubble ethics visit junior patrol wire fortune abstract bright"
 
+    # Address: VEYUFJ47IXLRCS7KZVWCR2LRAHRJF7FHFDX3JTUIRJDOXZEXYYYDI7B2DM
     if (index >0):
         sender_mnemonic = "kid bread axis pizza crumble wool rural tomato punch caution side legend immense search enlist exotic faculty tag wage reduce march desk vicious abandon slice"
 
@@ -72,8 +81,9 @@ def create_app(algod_client, sender_priv, approval_program, clear_program, globa
 
     # display results
     transaction_response = algod_client.pending_transaction_info(tx_id)
+    print("create_app txn response", transaction_response)
     app_id = transaction_response['application-index']
-    print("Created new app-id:", app_id)
+    print("=======> Created new app-id:", app_id)
 
     return app_id
 
@@ -97,19 +107,29 @@ def lsig_payment_txn(smart_sig_program, smart_sig_addr, amt, receiver_addr, algo
     pmtx = wait_for_confirmation(algod_client, tx_id, 10)
     return pmtx
 
-# Perform an ordinary payment transaction
-# params:
-#   sender_mnemonic
-def payment_transaction(sender_mnemonic, amt, rcv, algod_client)->dict:
+# Perform an ordinary payment transaction and wait for confirmation.
+def pay_and_wait(algod_client, sender_privkey, amt, rcv)->dict:
     params = algod_client.suggested_params()
-    senderAddr = mnemonic.to_public_key(sender_mnemonic)
-    senderPrivKey = mnemonic.to_private_key(sender_mnemonic)
+    senderAddr = account.address_from_private_key(sender_privkey)
     utxn = transaction.PaymentTxn(senderAddr, params, rcv, amt)
-    stxn = utxn.sign(senderPrivKey)
+    stxn = utxn.sign(sender_privkey)
     txid = algod_client.send_transaction(stxn)
     pmtx = wait_for_confirmation(algod_client, txid , 5)
     return pmtx
 
+
+def pay_and_wait_with_note(algod_client, sender_mnemonic, amt, rcv, note) -> dict:
+    params = algod_client.suggested_params()
+    senderAddr = mnemonic.to_public_key(sender_mnemonic)
+    senderPrivKey = mnemonic.to_private_key(sender_mnemonic)
+    utxn = transaction.PaymentTxn(senderAddr, params, rcv, amt,"",note)
+    stxn = utxn.sign(senderPrivKey)
+    txid = algod_client.send_transaction(stxn)
+    return wait_for_confirmation(algod_client, txid , 5)
+
+
+def get_account_balance(algod_client, account_addr) -> dict:
+    return algod_client.account_info(account_addr)['amount']
 
 def wait_for_confirmation(client, transaction_id, timeout):
     """

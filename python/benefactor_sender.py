@@ -4,7 +4,7 @@ from pyteal import *
 from helpers import compile_program, \
     get_funded_account, \
     lsig_payment_txn, \
-    payment_transaction, \
+    pay_and_wait, \
     wait_for_confirmation
 
 # user declared algod connection parameters. Node must have EnableDeveloperAPI set to true in its config
@@ -52,7 +52,7 @@ def main() :
 
     # Activate escrow contract by sending 2 algo and 1000 microalgo for transaction fee from creator
     amt = 2001000
-    payment_transaction(sender_mnemonic, amt, escrow_address, algod_client)
+    pay_and_wait(algod_client, sender_privkey, amt, escrow_address)
 
     print("--------------------------------------------")
     print("Withdraw from Donation Smart Signature......")
