@@ -10,9 +10,10 @@ from dsnp_contract_helpers import *
 algod_address = "http://localhost:4001"
 algod_token = "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
 
+registry_global_schema = transaction.StateSchema(1, 1)  # DSNPid current, last called handler
+registry_local_schema = transaction.StateSchema(1, 15)  # DSNPid, delegations
 
 # this is the registration contract
-# TODO: it should generate a new DSNPId and update its global state to the new id.
 # TODO: it should also be able to insert a new handle into a caller's local state
 # global state:
 #    d:  latest DSNPId, int
@@ -62,27 +63,34 @@ def clear_program_teal():
 # must be to the opted in contract
 # must pay a fee of 1 algo
 def registry_smart_sig_teal(signer_addr, registry_contract_addr):
-    fee = Int(1)
-
     ok = Return(Int(1))
     # Q: how do I tell if I'm already activated?
     # A: one way is an opt-in txn will fail
 
-    handle_payment = If(Or(
+    # In this mode remember:
+    # you cannot call log.
+    # you cannot call localPut or globalPut (b/c it's stateless, i.e. signature mode)
+
+    handle_app_call = If(Txn.sender() == Addr(registry_contract_addr)) \
+        .Then(Seq(Return(Int(1)))) \
+        .ElseIf( Txn.sender() == Addr(signer_addr) ) \
+        .Then(Return(Int(1))) \
+        .Else(Return(Int(0)))
+
+    handle_payment = If(
+        Or(
         Txn.sender() == Addr(registry_contract_addr),
-        Txn.sender() == Addr(signer_addr)
+        Txn.sender() == Addr(signer_addr),
+        Txn.receiver() == Addr(signer_addr)
     )).Then(Return(Int(1))).Else(Return(Int(0)))
 
-    program = Seq([
-        Cond(
-            [Txn.type_enum() == TxnType.ApplicationCall, ok],
+    # It's easy to increase the minimum balance in here, e.g.
+    # if you turn this into a Seq the minimum balance goes up
+    # from 100,000 to 278,500 microalgo
+    program = Cond(
+            [Txn.type_enum() == TxnType.ApplicationCall, handle_app_call],
             [Txn.type_enum() == TxnType.Payment, handle_payment]
-            ),
-        And(
-            Global.group_size() == Int(1),
-            Txn.amount() == fee,
-        )
-    ])
+            )
     # Mode.Signature indicates that this is a smart signature and not a smart contract.
     return compileTeal(program, Mode.Signature, version=5)
 
@@ -93,15 +101,13 @@ def main():
     # reg_owner will be the owner of the registration contract.
     reg_owner_addr, reg_owner_privKey, reg_owner_mnemonic = get_funded_account(0)
 
-    mainRegistrationContract_appID = 0
+    mainRegistrationContract_appID = 9
     try:
         app_info = algod_client.application_info(mainRegistrationContract_appID)
         print(f"App app info: {app_info}")
     except algosdk.error.AlgodHTTPError:
         _, approval_program = compile_program_to_bytes(algod_client, approval_program_teal(reg_owner_addr))
         _, clear_program = compile_program_to_bytes(algod_client, clear_program_teal())
-        registry_global_schema = transaction.StateSchema(1, 1)  # DSNPid current, last called handler
-        registry_local_schema = transaction.StateSchema(1, 1)  # DSNPid, handles registered
 
         before_bal = get_account_balance(algod_client, reg_owner_addr)
 
@@ -127,7 +133,7 @@ def main():
 
     # if smart sig balance is below min for this particular
     # contract (278500), the txn will fail
-    min_balance = 280000
+    min_balance = 1000000+1
     lsig = activate_and_sign_smart_sig(algod_client, min_balance, user_privKey, stateless_reg_contract_addr, smartsig_program)
 
     # Set up and fund a new user
